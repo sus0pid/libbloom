@@ -9,9 +9,9 @@
 #include "bloom.h"
 
 enum {
-    kPeerCount = 10,
-    kBitmapBytes = 32,
-    kHashProbes = 13,
+    kTargetEntries = 15,
+    kFilterBits = 288,
+    kFilterHashes = 13,
     kMaxKeyLen = 32
 };
 
@@ -37,11 +37,11 @@ static uint64_t xorshift64(uint64_t *state) {
 
 static int init_custom_filter(struct bloom *filter) {
     memset(filter, 0, sizeof(*filter));
-    filter->entries = kPeerCount;
+    filter->entries = kTargetEntries;
     filter->error = kTargetFalsePositive;
-    filter->bits = (unsigned long)kBitmapBytes * 8;
-    filter->bytes = kBitmapBytes;
-    filter->hashes = kHashProbes;
+    filter->bits = kFilterBits;
+    filter->bytes = (kFilterBits + 7) / 8;
+    filter->hashes = kFilterHashes;
     filter->bpe = (double)filter->bits / (double)filter->entries;
     filter->bf = calloc(filter->bytes, sizeof(unsigned char));
     if (filter->bf == NULL) {
@@ -60,11 +60,11 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    char peers[kPeerCount][kMaxKeyLen];
+    char peers[kTargetEntries][kMaxKeyLen];
     struct timespec start, end;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    for (uint64_t i = 0; i < kPeerCount; ++i) {
+    for (uint64_t i = 0; i < kTargetEntries; ++i) {
         snprintf(peers[i], sizeof(peers[i]), "peer-%02" PRIu64, i);
         int rc = bloom_add(&filter, peers[i], (int)strlen(peers[i]));
         if (rc < 0) {
@@ -74,9 +74,9 @@ int main(void) {
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
-    const double insert_ns = elapsed_ns(start, end) / kPeerCount;
+    const double insert_ns = elapsed_ns(start, end) / kTargetEntries;
 
-    for (uint64_t i = 0; i < kPeerCount; ++i) {
+    for (uint64_t i = 0; i < kTargetEntries; ++i) {
         if (bloom_check(&filter, peers[i], (int)strlen(peers[i])) != 1) {
             fprintf(stderr, "Membership check failed for %s\n", peers[i]);
             bloom_free(&filter);
@@ -84,10 +84,10 @@ int main(void) {
         }
     }
 
-    const size_t total_member_checks = kMemberBatches * kPeerCount;
+    const size_t total_member_checks = kMemberBatches * kTargetEntries;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (size_t batch = 0; batch < kMemberBatches; ++batch) {
-        for (uint64_t i = 0; i < kPeerCount; ++i) {
+        for (uint64_t i = 0; i < kTargetEntries; ++i) {
             (void)bloom_check(&filter, peers[i], (int)strlen(peers[i]));
         }
     }
@@ -110,13 +110,13 @@ int main(void) {
     const double observed_fpr = (double)false_hits / (double)kRandomTrials;
 
     printf("libbloom benchmark\n");
-    printf(" peers: %d\n bitmap: %d bytes (%u bits)\n hashes: %d\n target FPR: %.5f%%\n",
-           kPeerCount,
-           kBitmapBytes,
-           (unsigned)(kBitmapBytes * 8),
-           kHashProbes,
+    printf(" peers: %d\n bitmap: %lu bytes (%d bits)\n hashes: %d\n target FPR: %.5f%%\n",
+           kTargetEntries,
+           (unsigned long)filter.bytes,
+           kFilterBits,
+           kFilterHashes,
            kTargetFalsePositive * 100.0);
-    printf(" inserts: %.2f ns/op for %d peers\n", insert_ns, kPeerCount);
+    printf(" inserts: %.2f ns/op for %d peers\n", insert_ns, kTargetEntries);
     printf(" member lookups: %.2f ns/op over %zu checks\n",
            member_lookup_ns, total_member_checks);
     printf(" random lookups: %.2f ns/op over %zu checks\n",
