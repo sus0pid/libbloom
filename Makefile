@@ -81,6 +81,8 @@ endif
 
 all: $(BINDIR)/$(SO_VERSIONED) $(BINDIR)/libbloom.a
 
+benchmark: $(BINDIR)/libbloom_benchmark
+
 $(BINDIR)/$(SO_VERSIONED): $(BINDIR)/murmurhash2.o $(BINDIR)/bloom.o
 	(cd $(BINDIR) && \
 	    $(CC) $(OPT) $(LDFLAGS) bloom.o murmurhash2.o -shared \
@@ -104,6 +106,10 @@ $(BINDIR)/test-perf: $(TESTDIR)/perf.c $(BINDIR)/$(SO_VERSIONED)
 	$(CC) $(CFLAGS) $(OPT) $(INC) -c $(TESTDIR)/perf.c -o $(BINDIR)/perf.o
 	(cd $(BINDIR) && \
 	    $(CC) perf.o -L$(BINDIR) $(RPATH) -lbloom -o test-perf)
+
+$(BINDIR)/libbloom_benchmark: benchmarks/libbloom_benchmark.c $(BINDIR)/libbloom.a
+	$(CC) $(CFLAGS) $(OPT) $(INC) benchmarks/libbloom_benchmark.c \
+	    $(BINDIR)/libbloom.a $(LIB) -o $(BINDIR)/libbloom_benchmark
 
 $(BINDIR)/test-basic: $(TESTDIR)/basic.c $(BINDIR)/libbloom.a
 	$(CC) $(CFLAGS) $(OPT) $(INC) $(TESTDIR)/basic.c \
