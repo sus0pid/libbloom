@@ -10,12 +10,12 @@
 
 enum {
     kTargetEntries = 15,
-    kFilterBits = 288,
-    kFilterHashes = 13,
+    kFilterBits = 432,
+    kFilterHashes = 20,
     kMaxKeyLen = 32
 };
 
-static const double kTargetFalsePositive = 0.0001; /* 0.01% */
+static const double kTargetFalsePositive = 0.000001; /* 0.0001% */
 static const size_t kMemberBatches = 1u << 18;
 static const size_t kRandomTrials = 1u << 20;
 
